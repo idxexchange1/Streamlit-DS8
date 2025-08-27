@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import joblib
 
 # --------------------------
@@ -9,7 +8,7 @@ import joblib
 @st.cache_resource
 def load_model_and_encoders():
     model = joblib.load("xgb_model.pkl")
-    encoders = joblib.load("encoders.pkl")   # saved during training
+    encoders = joblib.load("encoders.pkl")
     return model, encoders
 
 model, encoders = load_model_and_encoders()
@@ -20,7 +19,6 @@ model, encoders = load_model_and_encoders()
 st.title("🏠 Home Price Prediction App")
 st.write("Enter property details below to estimate the **Close Price**.")
 
-# Layout with two columns
 col1, col2 = st.columns(2)
 
 with col1:
@@ -39,7 +37,6 @@ with col2:
     city = st.text_input("City", "Los Angeles")
     postal_code = st.text_input("Postal Code", "90065")
 
-# Extra categorical fields (dropdowns)
 flooring = st.selectbox("Flooring", ["Wood", "Tile", "Carpet", "Mixed"])
 levels = st.selectbox("Levels", ["One", "Two", "ThreeOrMore", "Unknown"])
 school = st.selectbox("Expensive School District?", ["No", "Yes"])
@@ -49,7 +46,6 @@ attractions = st.number_input("Additional Attractions (score)", min_value=0, val
 # Prepare input for prediction
 # --------------------------
 if st.button("Predict Price"):
-    # Convert inputs to a DataFrame
     input_dict = {
         "BedroomsTotal": bedrooms,
         "BathroomsTotalInteger": bathrooms,
@@ -71,20 +67,19 @@ if st.button("Predict Price"):
 
     input_df = pd.DataFrame([input_dict])
 
-    # 🔹 Apply label encoders (same as training)
+    # Apply encoders
     for col, le in encoders.items():
         try:
             input_df[col] = le.transform(input_df[col].astype(str))
         except ValueError:
-            # Handle unseen categories (not present during training)
-            input_df[col] = -1
+            input_df[col] = -1  # unseen category
 
-    # --------------------------
-    # Prediction
-    # --------------------------
+    # Ensure feature alignment
+    input_df = input_df[model.get_booster().feature_names]
+
     try:
         prediction = model.predict(input_df)[0]
         st.subheader(f"💰 Estimated Close Price: ${prediction:,.2f}")
     except Exception as e:
-        st.error("Error during prediction. Please check preprocessing.")
+        st.error("Error during prediction.")
         st.exception(e)
