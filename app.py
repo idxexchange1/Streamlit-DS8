@@ -4,14 +4,15 @@ import numpy as np
 import joblib
 
 # --------------------------
-# Load model
+# Load model + encoders
 # --------------------------
 @st.cache_resource
-def load_model():
+def load_model_and_encoders():
     model = joblib.load("xgb_model.pkl")
-    return model
+    encoders = joblib.load("encoders.pkl")   # saved during training
+    return model, encoders
 
-model = load_model()
+model, encoders = load_model_and_encoders()
 
 # --------------------------
 # Streamlit App UI
@@ -70,13 +71,20 @@ if st.button("Predict Price"):
 
     input_df = pd.DataFrame([input_dict])
 
-    # ⚠️ IMPORTANT: Encode/transform categorical features the same way as training
-    # For now, this is raw input. You need to apply LabelEncoder/OneHotEncoder
-    # with the same mapping used during training.
+    # 🔹 Apply label encoders (same as training)
+    for col, le in encoders.items():
+        try:
+            input_df[col] = le.transform(input_df[col].astype(str))
+        except ValueError:
+            # Handle unseen categories (not present during training)
+            input_df[col] = -1
 
+    # --------------------------
+    # Prediction
+    # --------------------------
     try:
         prediction = model.predict(input_df)[0]
         st.subheader(f"💰 Estimated Close Price: ${prediction:,.2f}")
     except Exception as e:
-        st.error("Error during prediction. Did you preprocess inputs the same way as training?")
+        st.error("Error during prediction. Please check preprocessing.")
         st.exception(e)
